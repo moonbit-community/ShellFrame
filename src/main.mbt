@@ -219,9 +219,10 @@ fn pixels_to_double(pixels : FixedArray[Byte], width : Int, height : Int) -> Fix
   ))
   for j = 0; j < height; j = j + 1 {
     for k = 0; k < width; k = k + 1 {
-      let r = pixels[0 * width * height + j * width + k].to_double() / 255.0
-      let g = pixels[1 * width * height + j * width + k].to_double() / 255.0
-      let b = pixels[2 * width * height + j * width + k].to_double() / 255.0
+      let idx = (j * width + k) * 3
+      let r = pixels[idx].to_double() / 255.0
+      let g = pixels[idx + 1].to_double() / 255.0  
+      let b = pixels[idx + 2].to_double() / 255.0
       let (y, cb, cr) = rgb_to_ycbcr(r, g, b)
       pixels_double[0][j][k] = y
       pixels_double[1][j][k] = cb
@@ -253,9 +254,10 @@ fn double_to_pixels(pixels_double : FixedArray[FixedArray[FixedArray[Double]]], 
         if v < 0.0 { 0.0 } else if v > 255.0 { 255.0 } else { v }
       }
       
-      pixels[0 * height * width + j * width + k] = r_clamped.to_int().to_byte()
-      pixels[1 * height * width + j * width + k] = g_clamped.to_int().to_byte()
-      pixels[2 * height * width + j * width + k] = b_clamped.to_int().to_byte()
+      let idx = (j * width + k) * 3
+      pixels[idx] = r_clamped.to_int().to_byte()
+      pixels[idx + 1] = g_clamped.to_int().to_byte()
+      pixels[idx + 2] = b_clamped.to_int().to_byte()
     }
   }
   pixels
@@ -392,6 +394,93 @@ fn apply_idct_to_image(pixels_dct : FixedArray[FixedArray[FixedArray[Double]]], 
   pixels_idct
 }
 
+fn zigzag_order() -> FixedArray[(Int, Int)] {
+  [
+    (0, 0), (0, 1), (1, 0), (2, 0), (1, 1), (0, 2), (0, 3), (1, 2),
+    (2, 1), (3, 0), (4, 0), (3, 1), (2, 2), (1, 3), (0, 4), (0, 5),
+    (1, 4), (2, 3), (3, 2), (4, 1), (5, 0), (6, 0), (5, 1), (4, 2),
+    (3, 3), (2, 4), (1, 5), (0, 6), (0, 7), (1, 6), (2, 5), (3, 4),
+    (4, 3), (5, 2), (6, 1), (7, 0), (7, 1), (6, 2), (5, 3), (4, 4),
+    (3, 5), (2, 6), (1, 7), (2, 7), (3, 6), (4, 5), (5, 4), (6, 3),
+    (7, 2), (7, 3), (6, 4), (5, 5), (4, 6), (3, 7), (4, 7), (5, 6),
+    (6, 5), (7, 4), (7, 5), (6, 6), (5, 7), (6, 7), (7, 6), (7, 7)
+  ]
+}
+
+fn run_length_encode(data : FixedArray[Byte]) -> FixedArray[Byte] {
+  let mut compressed = []
+  let mut i = 0
+  
+  while i < data.length() {
+    let current = data[i]
+    let mut count = 1
+    
+    while i + count < data.length() && data[i + count] == current && count < 255 {
+      count = count + 1
+    }
+    
+    if count > 3 || current == b'\x00' {
+      compressed = compressed + [b'\xff', count.to_byte(), current]
+    } else {
+      for j = 0; j < count; j = j + 1 {
+        compressed = compressed + [current]
+      }
+    }
+    i = i + count
+  }
+  
+  let result = FixedArray::make(compressed.length(), b'\x00')
+  for i = 0; i < compressed.length(); i = i + 1 {
+    result[i] = compressed[i]
+  }
+  result
+}
+
+fn compress_coefficients(pixels_dct : FixedArray[FixedArray[FixedArray[Double]]], width : Int, height : Int) -> FixedArray[Byte] {
+  let block_size = 8
+  let blocks_h = height / block_size
+  let blocks_w = width / block_size
+  let zigzag = zigzag_order()
+  
+  let total_coeffs = blocks_h * blocks_w * 3 * 64
+  let raw_data = FixedArray::make(total_coeffs, b'\x00')
+  let mut idx = 0
+  
+  for block_y = 0; block_y < blocks_h; block_y = block_y + 1 {
+    for block_x = 0; block_x < blocks_w; block_x = block_x + 1 {
+      for channel = 0; channel < 3; channel = channel + 1 {
+        for i = 0; i < 64; i = i + 1 {
+          let (y, x) = zigzag[i]
+          let img_y = block_y * block_size + y
+          let img_x = block_x * block_size + x
+          if img_y < height && img_x < width {
+            let coeff = pixels_dct[channel][img_y][img_x]
+            let quantized = coeff.to_int()
+            let clamped = if quantized > 127 { 127 } else if quantized < -128 { -128 } else { quantized }
+            raw_data[idx] = clamped.to_byte()
+          } else {
+            raw_data[idx] = b'\x00'
+          }
+          idx = idx + 1
+        }
+      }
+    }
+  }
+  
+  run_length_encode(raw_data)
+}
+
+fn save_dct_binary(pixels_dct : FixedArray[FixedArray[FixedArray[Double]]], width : Int, height : Int, filename : String) -> Unit {
+  let data = compress_coefficients(pixels_dct, width, height)
+  
+  try {
+    @fs.write_bytes_to_file(filename, @bytes.from_fixedarray(data))
+    println("Saved compressed DCT to \{filename} (\{data.length()} bytes)")
+  } catch {
+    e => println("Failed to save DCT binary: \{e}")
+  }
+}
+
 fn visualize_dct(pixels_dct : FixedArray[FixedArray[FixedArray[Double]]], width : Int, height : Int) -> FixedArray[FixedArray[FixedArray[Double]]] {
   let pixels_visual = FixedArray::makei(3, _ => FixedArray::makei(
     height,
@@ -462,6 +551,8 @@ fn main {
     println("Processing quality level: \{quality}...")
     
     let pixels_dct = apply_dct_to_image(pixels_double, width.to_int(), height.to_int(), quality)
+    
+    save_dct_binary(pixels_dct, width.to_int(), height.to_int(), "examples/out/peppers_compressed_q\{quality}.bin")
     
     let pixels_dct_visual = visualize_dct(pixels_dct, width.to_int(), height.to_int())
     let pixels_dct_bytes = double_to_pixels(pixels_dct_visual, width.to_int(), height.to_int())
