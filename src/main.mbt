@@ -1,9 +1,3 @@
-fn dct_coefficient(u : Int, v : Int, n : Int) -> Double {
-  let alpha_u = if u == 0 { 1.0 / 2.0.sqrt() } else { 1.0 }
-  let alpha_v = if v == 0 { 1.0 / 2.0.sqrt() } else { 1.0 }
-  2.0 / n.to_double() * alpha_u * alpha_v
-}
-
 fn get_quantization_matrix() -> FixedArray[FixedArray[Int]] {
   let matrix = FixedArray::makei(8, _ => FixedArray::make(8, 0))
   let values = [
@@ -64,32 +58,60 @@ fn dequantize_dct_block(quantized_block : FixedArray[FixedArray[Double]], q_matr
   dequantized
 }
 
+fn dct_1d(input : FixedArray[Double], n : Int) -> FixedArray[Double] {
+  let output = FixedArray::make(n, 0.0)
+  for u = 0; u < n; u = u + 1 {
+    let mut sum = 0.0
+    let alpha_u = if u == 0 { 1.0 / 2.0.sqrt() } else { 1.0 }
+    for x = 0; x < n; x = x + 1 {
+      let cos_term = @math.cos(
+        @math.PI * u.to_double() * (2 * x + 1).to_double() / (2 * n).to_double()
+      )
+      sum = sum + input[x] * cos_term
+    }
+    output[u] = alpha_u * sum * (2.0 / n.to_double()).sqrt()
+  }
+  output
+}
+
+fn idct_1d(input : FixedArray[Double], n : Int) -> FixedArray[Double] {
+  let output = FixedArray::make(n, 0.0)
+  for x = 0; x < n; x = x + 1 {
+    let mut sum = 0.0
+    for u = 0; u < n; u = u + 1 {
+      let alpha_u = if u == 0 { 1.0 / 2.0.sqrt() } else { 1.0 }
+      let cos_term = @math.cos(
+        @math.PI * u.to_double() * (2 * x + 1).to_double() / (2 * n).to_double()
+      )
+      sum = sum + alpha_u * input[u] * cos_term
+    }
+    output[x] = sum * (2.0 / n.to_double()).sqrt()
+  }
+  output
+}
+
 fn dct_2d(
   input : FixedArray[FixedArray[Double]],
   n : Int,
 ) -> FixedArray[FixedArray[Double]] {
+  let temp = FixedArray::makei(n, _ => FixedArray::make(n, 0.0))
   let output = FixedArray::makei(n, _ => FixedArray::make(n, 0.0))
-  for u = 0; u < n; u = u + 1 {
-    for v = 0; v < n; v = v + 1 {
-      let mut sum = 0.0
-      for x = 0; x < n; x = x + 1 {
-        for y = 0; y < n; y = y + 1 {
-          let cos_u = @math.cos(
-            @math.PI *
-            u.to_double() *
-            (2 * x + 1).to_double() /
-            (2 * n).to_double(),
-          )
-          let cos_v = @math.cos(
-            @math.PI *
-            v.to_double() *
-            (2 * y + 1).to_double() /
-            (2 * n).to_double(),
-          )
-          sum = sum + input[x][y] * cos_u * cos_v
-        }
-      }
-      output[u][v] = dct_coefficient(u, v, n) * sum
+  
+  for i = 0; i < n; i = i + 1 {
+    let row_dct = dct_1d(input[i], n)
+    for j = 0; j < n; j = j + 1 {
+      temp[i][j] = row_dct[j]
+    }
+  }
+  
+  for j = 0; j < n; j = j + 1 {
+    let col = FixedArray::make(n, 0.0)
+    for i = 0; i < n; i = i + 1 {
+      col[i] = temp[i][j]
+    }
+    let col_dct = dct_1d(col, n)
+    for i = 0; i < n; i = i + 1 {
+      output[i][j] = col_dct[i]
     }
   }
   output
@@ -99,30 +121,28 @@ fn idct_2d(
   input : FixedArray[FixedArray[Double]],
   n : Int,
 ) -> FixedArray[FixedArray[Double]] {
+  let temp = FixedArray::makei(n, _ => FixedArray::make(n, 0.0))
   let output = FixedArray::makei(n, _ => FixedArray::make(n, 0.0))
-  for x = 0; x < n; x = x + 1 {
-    for y = 0; y < n; y = y + 1 {
-      let mut sum = 0.0
-      for u = 0; u < n; u = u + 1 {
-        for v = 0; v < n; v = v + 1 {
-          let alpha_u = if u == 0 { 1.0 / 2.0.sqrt() } else { 1.0 }
-          let alpha_v = if v == 0 { 1.0 / 2.0.sqrt() } else { 1.0 }
-          let cos_u = @math.cos(
-            @math.PI *
-            u.to_double() *
-            (2 * x + 1).to_double() /
-            (2 * n).to_double(),
-          )
-          let cos_v = @math.cos(
-            @math.PI *
-            v.to_double() *
-            (2 * y + 1).to_double() /
-            (2 * n).to_double(),
-          )
-          sum = sum + alpha_u * alpha_v * input[u][v] * cos_u * cos_v
-        }
-      }
-      output[x][y] = 2.0 / n.to_double() * sum
+  
+  for i = 0; i < n; i = i + 1 {
+    let col = FixedArray::make(n, 0.0)
+    for j = 0; j < n; j = j + 1 {
+      col[j] = input[i][j]
+    }
+    let col_idct = idct_1d(col, n)
+    for j = 0; j < n; j = j + 1 {
+      temp[i][j] = col_idct[j]
+    }
+  }
+  
+  for j = 0; j < n; j = j + 1 {
+    let row = FixedArray::make(n, 0.0)
+    for i = 0; i < n; i = i + 1 {
+      row[i] = temp[i][j]
+    }
+    let row_idct = idct_1d(row, n)
+    for i = 0; i < n; i = i + 1 {
+      output[i][j] = row_idct[i]
     }
   }
   output
