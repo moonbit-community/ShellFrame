@@ -18,6 +18,54 @@ fn get_quantization_matrix() -> FixedArray[FixedArray[Int]] {
   matrix
 }
 
+fn calculate_block_variance(block : FixedArray[FixedArray[Double]], n : Int) -> Double {
+  let mut sum = 0.0
+  let mut sum_sq = 0.0
+  let total = n * n
+  
+  for i = 0; i < n; i = i + 1 {
+    for j = 0; j < n; j = j + 1 {
+      let val = block[i][j]
+      sum = sum + val
+      sum_sq = sum_sq + val * val
+    }
+  }
+  
+  let mean = sum / total.to_double()
+  let variance = sum_sq / total.to_double() - mean * mean
+  variance
+}
+
+fn adaptive_quantization_matrix(base_matrix : FixedArray[FixedArray[Int]], quality : Int, variance : Double, channel : Int) -> FixedArray[FixedArray[Double]] {
+  let scaled_matrix = FixedArray::makei(8, _ => FixedArray::make(8, 0.0))
+  let base_scale_factor = if quality < 50 {
+    5000.0 / quality.to_double()
+  } else {
+    200.0 - 2.0 * quality.to_double()
+  }
+  
+  let variance_factor = if variance > 0.1 {
+    0.8
+  } else if variance > 0.05 {
+    0.9
+  } else {
+    1.2
+  }
+  
+  let chroma_scale = if channel == 0 { 1.0 } else { 1.5 }
+  
+  for i = 0; i < 8; i = i + 1 {
+    for j = 0; j < 8; j = j + 1 {
+      let scaled_value = {
+        let v = base_matrix[i][j].to_double() * base_scale_factor * variance_factor * chroma_scale / 100.0
+        if v < 1.0 { 1.0 } else { v }
+      }
+      scaled_matrix[i][j] = scaled_value
+    }
+  }
+  scaled_matrix
+}
+
 fn scale_quantization_matrix(base_matrix : FixedArray[FixedArray[Int]], quality : Int) -> FixedArray[FixedArray[Double]] {
   let scaled_matrix = FixedArray::makei(8, _ => FixedArray::make(8, 0.0))
   let scale_factor = if quality < 50 {
@@ -238,8 +286,9 @@ fn apply_dct_to_image(pixels_double : FixedArray[FixedArray[FixedArray[Double]]]
         }
         
         let dct_block = dct_2d(block, block_size)
+        let variance = calculate_block_variance(block, block_size)
         let base_matrix = get_quantization_matrix()
-        let q_matrix = scale_quantization_matrix(base_matrix, quality)
+        let q_matrix = adaptive_quantization_matrix(base_matrix, quality, variance, channel)
         let quantized_block = quantize_dct_block(dct_block, q_matrix)
         
         for y = 0; y < block_size; y = y + 1 {
