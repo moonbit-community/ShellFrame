@@ -282,7 +282,12 @@ fn apply_dct_to_image(pixels_double : FixedArray[FixedArray[FixedArray[Double]]]
             let img_y = block_y * block_size + y
             let img_x = block_x * block_size + x
             if img_y < height && img_x < width {
-              block[y][x] = pixels_double[channel][img_y][img_x] * 255.0 - 128.0
+              let pixel_val = if channel == 0 {
+                pixels_double[channel][img_y][img_x] * 255.0 - 128.0
+              } else {
+                (pixels_double[channel][img_y][img_x] - 0.5) * 255.0
+              }
+              block[y][x] = pixel_val
             }
           }
         }
@@ -383,7 +388,11 @@ fn apply_idct_to_image(pixels_dct : FixedArray[FixedArray[FixedArray[Double]]], 
             let img_y = block_y * block_size + y
             let img_x = block_x * block_size + x
             if img_y < height && img_x < width {
-              let pixel_value = (idct_block[y][x] + 128.0) / 255.0
+              let pixel_value = if channel == 0 {
+                (idct_block[y][x] + 128.0) / 255.0
+              } else {
+                idct_block[y][x] / 255.0 + 0.5
+              }
               pixels_idct[channel][img_y][img_x] = pixel_value
             }
           }
