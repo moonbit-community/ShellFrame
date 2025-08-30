@@ -148,16 +148,36 @@ fn idct_2d(
   output
 }
 
+fn rgb_to_ycbcr(r : Double, g : Double, b : Double) -> (Double, Double, Double) {
+  let y = 0.299 * r + 0.587 * g + 0.114 * b
+  let cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 0.5
+  let cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 0.5
+  (y, cb, cr)
+}
+
+fn ycbcr_to_rgb(y : Double, cb : Double, cr : Double) -> (Double, Double, Double) {
+  let cb_adj = cb - 0.5
+  let cr_adj = cr - 0.5
+  let r = y + 1.402 * cr_adj
+  let g = y - 0.344136 * cb_adj - 0.714136 * cr_adj
+  let b = y + 1.772 * cb_adj
+  (r, g, b)
+}
+
 fn pixels_to_double(pixels : FixedArray[Byte], width : Int, height : Int) -> FixedArray[FixedArray[FixedArray[Double]]] {
   let pixels_double = FixedArray::makei(3, _ => FixedArray::makei(
     height,
     _ => FixedArray::make(width, 0.0),
   ))
-  for i = 0; i < 3; i = i + 1 {
-    for j = 0; j < height; j = j + 1 {
-      for k = 0; k < width; k = k + 1 {
-        pixels_double[i][j][k] = pixels[i * width * height + j * width + k].to_double() / 255.0
-      }
+  for j = 0; j < height; j = j + 1 {
+    for k = 0; k < width; k = k + 1 {
+      let r = pixels[0 * width * height + j * width + k].to_double() / 255.0
+      let g = pixels[1 * width * height + j * width + k].to_double() / 255.0
+      let b = pixels[2 * width * height + j * width + k].to_double() / 255.0
+      let (y, cb, cr) = rgb_to_ycbcr(r, g, b)
+      pixels_double[0][j][k] = y
+      pixels_double[1][j][k] = cb
+      pixels_double[2][j][k] = cr
     }
   }
   pixels_double
@@ -165,15 +185,29 @@ fn pixels_to_double(pixels : FixedArray[Byte], width : Int, height : Int) -> Fix
 
 fn double_to_pixels(pixels_double : FixedArray[FixedArray[FixedArray[Double]]], width : Int, height : Int) -> FixedArray[Byte] {
   let pixels = FixedArray::make(3 * height * width, b'\x00')
-  for i = 0; i < 3; i = i + 1 {
-    for j = 0; j < height; j = j + 1 {
-      for k = 0; k < width; k = k + 1 {
-        let value = {
-          let v = pixels_double[i][j][k] * 255.0
-          if v < 0.0 { 0.0 } else if v > 255.0 { 255.0 } else { v }
-        }
-        pixels[i * height * width + j * width + k] = value.to_int().to_byte()
+  for j = 0; j < height; j = j + 1 {
+    for k = 0; k < width; k = k + 1 {
+      let y = pixels_double[0][j][k]
+      let cb = pixels_double[1][j][k]
+      let cr = pixels_double[2][j][k]
+      let (r, g, b) = ycbcr_to_rgb(y, cb, cr)
+      
+      let r_clamped = {
+        let v = r * 255.0
+        if v < 0.0 { 0.0 } else if v > 255.0 { 255.0 } else { v }
       }
+      let g_clamped = {
+        let v = g * 255.0
+        if v < 0.0 { 0.0 } else if v > 255.0 { 255.0 } else { v }
+      }
+      let b_clamped = {
+        let v = b * 255.0
+        if v < 0.0 { 0.0 } else if v > 255.0 { 255.0 } else { v }
+      }
+      
+      pixels[0 * height * width + j * width + k] = r_clamped.to_int().to_byte()
+      pixels[1 * height * width + j * width + k] = g_clamped.to_int().to_byte()
+      pixels[2 * height * width + j * width + k] = b_clamped.to_int().to_byte()
     }
   }
   pixels
