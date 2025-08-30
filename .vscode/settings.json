@@ -1,0 +1,35 @@
+{
+  "C_Cpp.default.includePath": [
+    "~/.moon/include",
+    "/usr/include/ImageMagick-7"
+  ],
+  "files.associations": {
+    "*.dbclient-js": "javascript",
+    "*.sqlbook": "sql",
+    "*.ndjson": "jsonl",
+    "dns-query": "json",
+    ".env*": "dotenv",
+    "cstdlib": "c",
+    "gimpcoreapp.h": "c",
+    "moonbit.h": "c",
+    "stm32f1xx_hal.h": "c",
+    "stm32f1xx_hal_conf.h": "c",
+    "limits": "cpp",
+    "ostream": "cpp",
+    "iomanip": "cpp",
+    "netdb.h": "c",
+    "socket.h": "c",
+    "types.h": "c",
+    "errno.h": "c",
+    "spec": "shellscript",
+    "defines": "shellscript",
+    "beyond": "shellscript",
+    "*.stage2": "shellscript",
+    "magickwand.h": "c",
+    "animate.h": "c",
+    "magickcore.h": "c",
+    "composite.h": "c",
+    "magick-config.h": "c",
+    "method-attribute.h": "c"
+  }
+}
