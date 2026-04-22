@@ -1,0 +1,18 @@
+import {
+  "tonyfettes/encoding",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
+}
+
+supported_targets = "native"
+
+options(
+  "is-main": true,
+  link: {
+    "native": {
+      "cc-flags": "`MagickWand-config --cflags --cppflags` `MagickWand-config --ldflags --libs`",
+      "stub-cc-flags": "`MagickWand-config --cflags --cppflags` `MagickWand-config --ldflags --libs`",
+    },
+  },
+  "native-stub": [ "magick_stub.c" ],
+)
