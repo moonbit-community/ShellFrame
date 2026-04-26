@@ -1,4 +1,10 @@
+#if __has_include(<MagickWand/MagickWand.h>)
 #include <MagickWand/MagickWand.h>
+#elif __has_include(<wand/MagickWand.h>)
+#include <wand/MagickWand.h>
+#else
+#error "MagickWand headers not found"
+#endif
 
 #include "moonbit.h"
 

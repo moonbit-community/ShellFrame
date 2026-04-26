@@ -8,9 +8,11 @@ extern "C" fn magick_wand_terminus() = "MagickWandTerminus"
 #external
 type MagickWand
 
-typealias UInt64 as size_t
+///|
+type SizeT = UInt64
 
-typealias Int64 as ssize_t
+///|
+type SSizeT = Int64
 
 ///|
 extern "C" fn magick_wand_new() -> MagickWand = "SFStubNewMagickWand"
@@ -19,7 +21,15 @@ extern "C" fn magick_wand_new() -> MagickWand = "SFStubNewMagickWand"
 enum MagickBooleanType {
   MagickFalse = 0
   MagickTrue = 1
-} derive(Show)
+} derive(Debug)
+
+///|
+impl Show for MagickBooleanType with output(self, logger) {
+  match self {
+    MagickFalse => logger.write_string("MagickFalse")
+    MagickTrue => logger.write_string("MagickTrue")
+  }
+}
 
 ///|
 #borrow(wand, filename)
@@ -37,24 +47,20 @@ extern "C" fn magick_wand_write_image(
 
 ///|
 #borrow(wand)
-extern "C" fn magick_wand_get_image_width(
-  wand : MagickWand,
-) -> size_t = "SFStubMagickGetImageWidth"
+extern "C" fn magick_wand_get_image_width(wand : MagickWand) -> SizeT = "SFStubMagickGetImageWidth"
 
 ///|
 #borrow(wand)
-extern "C" fn magick_wand_get_image_height(
-  wand : MagickWand,
-) -> size_t = "SFStubMagickGetImageHeight"
+extern "C" fn magick_wand_get_image_height(wand : MagickWand) -> SizeT = "SFStubMagickGetImageHeight"
 
 ///|
 #borrow(wand, pixels)
 extern "C" fn magick_wand_export_image_pixels(
   wand : MagickWand,
-  x : ssize_t,
-  y : ssize_t,
-  columns : size_t,
-  rows : size_t,
+  x : SSizeT,
+  y : SSizeT,
+  columns : SizeT,
+  rows : SizeT,
   pixels : FixedArray[Byte],
 ) -> MagickBooleanType = "SFStubMagickExportImagePixels"
 
@@ -62,9 +68,9 @@ extern "C" fn magick_wand_export_image_pixels(
 #borrow(wand, pixels)
 extern "C" fn magick_wand_import_image_pixels(
   wand : MagickWand,
-  x : ssize_t,
-  y : ssize_t,
-  columns : size_t,
-  rows : size_t,
+  x : SSizeT,
+  y : SSizeT,
+  columns : SizeT,
+  rows : SizeT,
   pixels : FixedArray[Byte],
 ) -> MagickBooleanType = "SFStubMagickImportImagePixels"
