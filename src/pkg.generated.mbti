@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ShellWen/shell-frame"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+type MagickBooleanType derive(@debug.Debug)
+
+type MagickWand
+
+// Type aliases
+
+// Traits
+

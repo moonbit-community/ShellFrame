@@ -652,10 +652,11 @@ fn save_dct_binary(
   let data = compress_coefficients(pixels_dct, width, height)
 
   try {
-    @fs.write_bytes_to_file(filename, @bytes.from_fixedarray(data))
+    @fs.write_bytes_to_file(filename, Bytes::from_array(data))
     println("Saved compressed DCT to \{filename} (\{data.length()} bytes)")
   } catch {
-    e => println("Failed to save DCT binary: \{e}")
+    e =>
+      println("Failed to save DCT binary: \{@debug.render(@debug.to_repr(e))}")
   }
 }
 
